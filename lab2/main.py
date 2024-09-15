@@ -35,7 +35,7 @@ def main():
                 'age_years': compute_repo_age(repo),
                 'releases': get_release_count(repo),
                 'loc': compute_loc(ck_df),
-                # Add other metrics as needed
+
             })
             quality_metrics.append(metrics)
 
