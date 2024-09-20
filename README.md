@@ -8,6 +8,7 @@ Biblitecas usadas
 
 TO-DO
 
+Arrumar o erro que não permite que se pegue todos os repos. Provavelmente estou excluindo um repositorio antes dele ser testado pelo ck.
 Consolidar os calculos de metricas
 Montar os visuais (Tentar usar o bokeh lib de python)
 Fazer o relatorio
