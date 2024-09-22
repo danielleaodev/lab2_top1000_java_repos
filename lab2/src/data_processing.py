@@ -4,18 +4,29 @@ from git import Repo
 import shutil
 import stat
 import time
+from git import GitCommandError
 
 def remove_readonly(func, path, excinfo):
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
-def clone_repo(repo_url, clone_dir):
-    if not os.path.exists(clone_dir):
-        repo = Repo.clone_from(repo_url, clone_dir)
-        print(f"Clonado {repo_url} em {clone_dir}")
-        del repo  # Remove a referência ao objeto Repo
-    else:
-        print(f"Repositório {repo_url} já foi clonado.")
+def clone_repo(repo_url, clone_dir, max_retries=3):
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            print(f"Tentando clonar o repositório {repo_url} (tentativa {attempt+1}/{max_retries})")
+            Repo.clone_from(repo_url, clone_dir)
+            print(f"Clonado com sucesso: {repo_url}")
+            return True
+        except GitCommandError as e:
+            print(f"Erro ao clonar {repo_url}: {e}")
+            attempt += 1
+            if attempt < max_retries:
+                print(f"Tentando novamente após uma pausa...")
+                time.sleep(5)  # Pausa de 5 segundos antes de tentar novamente
+            else:
+                print(f"Falha ao clonar o repositório {repo_url} após {max_retries} tentativas.")
+                return False
 
 def run_ck(java_project_path, output_dir):
     ck_jar_name = 'ck-0.7.1-SNAPSHOT-jar-with-dependencies.jar'
@@ -36,7 +47,7 @@ def run_ck(java_project_path, output_dir):
         output_dir
     ]
     try:
-        result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         print(f"Métricas CK calculadas para {java_project_path}")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao executar o CK para {java_project_path}: {e.stderr}")

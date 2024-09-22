@@ -1,73 +1,158 @@
-# main.py
-from src.data_collection import fetch_top_java_repos
-from src.data_processing import process_repo
-from src.data_analysis import load_ck_metrics, compute_quality_metrics
+import os
+import shutil  # Para excluir diretórios
 import pandas as pd
 from multiprocessing import Pool
 from datetime import datetime
+from src.data_collection import fetch_top_java_repos, save_repos_info_to_csv
+from src.data_processing import clone_repo, process_repo
+from src.data_analysis import load_ck_metrics, compute_quality_metrics
+import stat
+
+# Função para calcular a idade do repositório
+def compute_repo_age(repo):
+    created_at = datetime.strptime(repo['created_at'], '%Y-%m-%dT%H:%M:%SZ')
+    age_years = (datetime.now() - created_at).days / 365
+    return age_years
+
+# Função para contar releases
+def get_release_count(repo):
+    return repo.get('releases', {}).get('total_count', 0)
+
+# Função para contar linhas de código (LOC)
+def compute_loc(df):
+    return df['loc'].sum()
+
+# Função para inicializar os arquivos CSV
+def init_csv_files():
+    if not os.path.exists('data'):
+        os.makedirs('data')
+
+    # Inicializando o CSV com informações básicas dos repositórios e métricas CK
+    quality_csv_path = 'data/quality_metrics.csv'
+    if not os.path.exists(quality_csv_path):
+        pd.DataFrame(columns=[
+            'repo_name', 'stars', 'forks', 'age_years', 'releases', 'loc', 
+            'cbo_sum', 'dit_sum', 'lcom_sum']).to_csv(quality_csv_path, index=False)
+
+# Função para verificar se os arquivos de métricas CK já existem
+def ck_results_exist(repo_name):
+    file_path = os.path.join('data', 'ck_results', f"{repo_name}_class.csv")
+    return os.path.exists(file_path)
+
+# Função para excluir repositórios após o processamento
+def delete_repo(clone_dir):
+    def on_rm_error(func, path, exc_info):
+        os.chmod(path, stat.S_IWRITE)
+        os.unlink(path)
+
+    if os.path.exists(clone_dir):
+        shutil.rmtree(clone_dir, onerror=on_rm_error)
+        print(f"Repositório {clone_dir} excluído após a análise.")
+    else:
+        print(f"Repositório {clone_dir} não encontrado para exclusão.")
+
+# Função para processar um único repositório e salvar as métricas CK junto com os dados básicos
+def process_and_save_metrics(repo):
+    repo_name = repo['name']
+    repo_url = repo['html_url']  # URL do repositório
+
+    # Verificar se já existem resultados CK para este repositório
+    if ck_results_exist(repo_name):
+        print(f"Resultados CK já existentes para {repo_name}. Pulando processamento.")
+        return  # Se já houver resultados, pular o processamento
+
+    # Clonar o repositório e calcular as métricas CK
+    clone_dir = os.path.join('data', 'repos', repo_name)
+    if not clone_repo(repo_url, clone_dir):
+        print(f"Repositório {repo_name} ignorado devido a falhas na clonagem.")
+        return  # Ignorar este repositório e continuar com os próximos
+
+    # Continuar com o processamento e cálculos das métricas CK
+    ck_df = load_ck_metrics(repo_name)
+    if not ck_df.empty:
+        metrics = compute_quality_metrics(ck_df)
+        metrics.update({
+            'repo_name': repo_name,
+            'stars': repo['stargazers_count'],
+            'forks': repo['forks_count'],
+            'age_years': compute_repo_age(repo),
+            'releases': get_release_count(repo),
+            'loc': compute_loc(ck_df),
+        })
+
+        # Adiciona métricas de qualidade ao arquivo CSV em modo append
+        pd.DataFrame([metrics]).to_csv('data/quality_metrics.csv', mode='a', header=False, index=False)
+        print(f"Métricas para {repo_name} salvas.")
+    else:
+        print(f"Nenhuma métrica CK encontrada para {repo_name}, mas informações básicas foram salvas.")
+
+    # Excluir o repositório após o processamento
+    delete_repo(clone_dir)
+
+def compile_metrics(repo):
+    repo_name = repo['name']
+    print(f"Compilando métricas para {repo_name}")
+
+    metrics = {
+        'repo_name': repo_name,
+        'stars': repo['stargazers_count'],
+        'forks': repo['forks_count'],
+        'age_years': compute_repo_age(repo),
+        'releases': repo['releases_count'],
+        'loc': 0,
+        'cbo_sum': 0,
+        'dit_sum': 0,
+        'lcom_sum': 0
+    }
+
+    ck_file_path = os.path.join('data', 'ck_results', f"{repo_name}class.csv")
+    if os.path.exists(ck_file_path):
+        ck_df = pd.read_csv(ck_file_path)
+        if not ck_df.empty:
+            quality_metrics = compute_quality_metrics(ck_df)
+            metrics.update(quality_metrics)
+            metrics['loc'] = compute_loc(ck_df)
+            print(f"Métricas CK compiladas para {repo_name}")
+        else:
+            print(f"Arquivo CK vazio para {repo_name}")
+    else:
+        print(f"Nenhum resultado CK encontrado para {repo_name}")
+
+    return metrics
+
+# Função para salvar todas as métricas consolidadas
+def save_all_metrics(all_metrics):
+    pd.DataFrame(all_metrics).to_csv('data/quality_metrics.csv', mode='w', header=True, index=False)
+    print("Todas as métricas foram salvas no CSV.")
 
 def main():
-    # Step 1: Data Collection
+    # Inicializar os arquivos CSV se ainda não existirem
+    init_csv_files()
+
     print("Fetching top Java repositories...")
     repos = fetch_top_java_repos(n=1000)
+    save_repos_info_to_csv(repos)
 
-    # Convert to DataFrame for easy handling
-    repos_df = pd.DataFrame(repos)
-    repos_df.to_csv('data/repos_info.csv', index=False)
-
-    # Step 2: Data Processing
     print("Cloning repositories and computing CK metrics...")
     with Pool(processes=4) as pool:
-        pool.map(process_repo, repos)
+        pool.map(process_and_save_metrics, repos)
 
-    # Step 3: Data Analysis
-    print("Analyzing CK metrics...")
-    quality_metrics = []
-    for repo in repos:
-        repo_name = repo['name']
-        ck_df = load_ck_metrics(repo_name)
-        if not ck_df.empty:
-            metrics = compute_quality_metrics(ck_df)
-            metrics.update({
-                'repo_name': repo_name,
-                'stars': repo['stargazers_count'],
-                'forks': repo['forks_count'],
-                'age_years': compute_repo_age(repo),
-                'releases': get_release_count(repo),
-                'loc': compute_loc(ck_df),
+    # Carregar informações dos repositórios do CSV existente
+    repos_info = pd.read_csv('data/repos_info.csv')
+    repos = repos_info.to_dict('records')
 
-            })
-            quality_metrics.append(metrics)
+    print("Compilando métricas CK existentes...")
+    with Pool(processes=4) as pool:
+        pool.map(process_and_save_metrics, repos)
+    
+    # all_metrics = []
+    # for _, repo in repos_info.iterrows():
+    #     metrics = compile_metrics(repo)
+    #     all_metrics.append(metrics)
 
-    # Convert to DataFrame
-    quality_df = pd.DataFrame(quality_metrics)
-    quality_df.to_csv('data/quality_metrics.csv', index=False)
+    # # Salvar todas as métricas consolidadas
+    # save_all_metrics(all_metrics)
 
-    # Step 4: Answer Research Questions
-    # Perform statistical analysis and plotting
-    answer_research_questions(quality_df)
 
 if __name__ == '__main__':
     main()
-
-
-def compute_repo_age(repo):
-    created_at = datetime.strptime(repo['created_at'], '%Y-%m-%dT%H:%M:%SZ')
-    age = (datetime.now() - created_at).days / 365
-    return age
-
-def get_release_count(repo):
-    return repo['open_issues_count']  # Or fetch releases using GitHub API if necessary
-
-def compute_loc(ck_df):
-    return ck_df['loc'].sum()
-
-def answer_research_questions(df):
-    # RQ01: Popularity vs Quality
-    import matplotlib.pyplot as plt
-    plt.scatter(df['stars'], df['cbo_mean'])
-    plt.xlabel('Stars')
-    plt.ylabel('Mean CBO')
-    plt.title('Popularity vs Coupling (CBO)')
-    plt.savefig('data/plots/popularity_vs_cbo.png')
-    # Similarly for other metrics and research questions
