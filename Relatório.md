@@ -39,6 +39,8 @@ Este relatório busca responder às seguintes perguntas de pesquisa:
 - **DIT (Depth of Inheritance Tree)**: Mede a profundidade máxima da hierarquia de herança no projeto.
 - **LCOM (Lack of Cohesion of Methods)**: Mede o quão bem os métodos dentro de uma classe estão relacionados entre si.
 
+Foram utilizados gráficos de dispersão para conseguir melhor analisar como essas métricas interagem entre si.
+
 ## 3. Resultados
 
 ### 3.1 Relação Entre Popularidade e Qualidade
