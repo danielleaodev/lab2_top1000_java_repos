@@ -10,7 +10,7 @@ Para mitigar esses riscos, muitas abordagens modernas integram boas práticas co
 
 ### 2.1 Seleção de Repositórios
 
-Selecionamos os 1.000 repositórios mais populares no GitHub escritos em Java. Para esses repositórios, coletamos as métricas discutidas abaixo usando as APIs do GitHub e uma ferramenta de análise estática, CK.
+Selecionamos os 1.000 repositórios mais populares no GitHub escritos em Java. Para esses repositórios, coletamos as métricas discutidas abaixo usando as APIs do GitHub e uma ferramenta de análise estática, CK. Desses 1000, por problemas de execução, só foi possível analisar 420 repositórios.
 
 ### 2.2 Perguntas de Pesquisa
 
