@@ -51,22 +51,3 @@ def run_ck(java_project_path, output_dir):
         print(f"Métricas CK calculadas para {java_project_path}")
     except subprocess.CalledProcessError as e:
         print(f"Erro ao executar o CK para {java_project_path}: {e.stderr}")
-
-def process_repo(repo_info):
-    repo_url = repo_info['clone_url']
-    repo_name = repo_info['name']
-    clone_dir = os.path.join('data', 'repos', repo_name)
-    output_dir = os.path.join('data', 'ck_results', repo_name)
-
-    clone_repo(repo_url, clone_dir)
-    run_ck(clone_dir, output_dir)
-
-    # Aguarda um momento antes de excluir
-    time.sleep(30)
-
-    # Excluir o repositório
-    try:
-        shutil.rmtree(clone_dir, onexc=remove_readonly)
-        print(f"Repositório {repo_name} excluído após a análise.")
-    except Exception as e:
-        print(f"Erro ao excluir o repositório {repo_name}: {e}")

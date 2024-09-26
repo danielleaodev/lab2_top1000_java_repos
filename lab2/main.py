@@ -89,36 +89,6 @@ def process_and_save_metrics(repo):
     # Excluir o repositório após o processamento
     delete_repo(clone_dir)
 
-def compile_metrics(repo):
-    repo_name = repo['name']
-    print(f"Compilando métricas para {repo_name}")
-
-    metrics = {
-        'repo_name': repo_name,
-        'stars': repo['stargazers_count'],
-        'forks': repo['forks_count'],
-        'age_years': compute_repo_age(repo),
-        'releases': repo['releases_count'],
-        'loc': 0,
-        'cbo_sum': 0,
-        'dit_sum': 0,
-        'lcom_sum': 0
-    }
-
-    ck_file_path = os.path.join('data', 'ck_results', f"{repo_name}class.csv")
-    if os.path.exists(ck_file_path):
-        ck_df = pd.read_csv(ck_file_path)
-        if not ck_df.empty:
-            quality_metrics = compute_quality_metrics(ck_df)
-            metrics.update(quality_metrics)
-            metrics['loc'] = compute_loc(ck_df)
-            print(f"Métricas CK compiladas para {repo_name}")
-        else:
-            print(f"Arquivo CK vazio para {repo_name}")
-    else:
-        print(f"Nenhum resultado CK encontrado para {repo_name}")
-
-    return metrics
 
 # Função para salvar todas as métricas consolidadas
 def save_all_metrics(all_metrics):
@@ -133,10 +103,6 @@ def main():
     repos = fetch_top_java_repos(n=1000)
     save_repos_info_to_csv(repos)
 
-    print("Cloning repositories and computing CK metrics...")
-    with Pool(processes=4) as pool:
-        pool.map(process_and_save_metrics, repos)
-
     # Carregar informações dos repositórios do CSV existente
     repos_info = pd.read_csv('data/repos_info.csv')
     repos = repos_info.to_dict('records')
@@ -144,15 +110,6 @@ def main():
     print("Compilando métricas CK existentes...")
     with Pool(processes=4) as pool:
         pool.map(process_and_save_metrics, repos)
-    
-    # all_metrics = []
-    # for _, repo in repos_info.iterrows():
-    #     metrics = compile_metrics(repo)
-    #     all_metrics.append(metrics)
-
-    # # Salvar todas as métricas consolidadas
-    # save_all_metrics(all_metrics)
-
 
 if __name__ == '__main__':
     main()
