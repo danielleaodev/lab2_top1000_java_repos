@@ -84,7 +84,7 @@ Foram utilizados gráficos de dispersão para conseguir melhor analisar como ess
 **Conclusão:** O tamanho do repositório (LOC) tem uma relação negativa com o acoplamento entre objetos (CBO) e a falta de coesão dos métodos (LCOM). À medida que o código cresce, há maior tendência de acoplamento e perda de coesão.
 
 
-## Data Viz
+## Gráficos
 ![Análise popularidade](popularidade.png)
 ![Análise maturidade](maturidade.png)
 ![Análise atividade](atividade.png)
